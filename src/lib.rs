@@ -113,14 +113,77 @@ fn ann_req_msg(connection_id: u64, torrent: &Torrent, port: u16) -> Vec<u8> {
     // TODO [56..64] downloaded
     println!("torrent.size(): {:?}", torrent.size());
     BigEndian::write_u64(&mut b[64..72], torrent.size()); // [64..72] left
-                                                          // TODO [72..80] uploaded
-                                                          // TODO [80..84] event (0:none, 1:completed, 2:started, 3:stopped)
-                                                          // TODO [84..88] ip address
+
+    // TODO [72..80] uploaded
+    // TODO [80..84] event (0:none, 1:completed, 2:started, 3:stopped)
+    // TODO [84..88] ip address
+
     let random_bytes = rand::thread_rng().gen::<[u8; 4]>();
     b[88..92].clone_from_slice(&random_bytes[..]); // [88..92] key (random)
     BigEndian::write_i32(&mut b[92..96], -1); // [92..96] num_want (default: -1)
     BigEndian::write_u16(&mut b[96..98], port); // [96..98] port
     b.to_vec()
+}
+
+fn resp_type(b: &Vec<u8>) -> u32 {
+    let action = BigEndian::read_u32(&b[0..4]);
+    if action == 0 {
+        return CONNECT_MSG;
+    } else {
+        return ANNOUNCE_MSG;
+    }
+}
+
+#[derive(Debug)]
+struct ConnResp {
+    action: u32,
+    transaction_id: u32,
+    connection_id: u64,
+}
+fn parse_connect_resp(b: &Vec<u8>) -> ConnResp {
+    ConnResp {
+        action: BigEndian::read_u32(&b[0..4]),
+        transaction_id: BigEndian::read_u32(&b[4..8]),
+        connection_id: BigEndian::read_u64(&b[8..]),
+    }
+}
+
+#[derive(Debug)]
+struct Peer {
+    ip: u32,
+    port: u32,
+}
+
+#[derive(Debug)]
+struct AnnResp {
+    action: u32,
+    transaction_id: u32,
+    interval: u32,
+    leechers: u32,
+    seeders: u32,
+    peers: Vec<Peer>,
+}
+fn parse_announce_resp(b: &Vec<u8>) -> AnnResp {
+    let mut peers: Vec<Peer> = Vec::new();
+    let n_peers = (b.len() - 20) / 6;
+    for i in 0..n_peers {
+        let peer: Peer = Peer {
+            ip: BigEndian::read_u32(&b[20 + (6 * i)..24 + (6 * i)]),
+            port: BigEndian::read_u32(&b[24 + (6 * i)..26 + (6 * i)]),
+        };
+        peers.push(peer);
+    }
+
+    let ann_resp: AnnResp = AnnResp {
+        action: BigEndian::read_u32(&b[0..4]),
+        transaction_id: BigEndian::read_u32(&b[4..8]),
+        interval: BigEndian::read_u32(&b[8..12]),
+        leechers: BigEndian::read_u32(&b[12..16]),
+        seeders: BigEndian::read_u32(&b[16..20]),
+        peers: peers,
+    };
+
+    ann_resp
 }
 
 #[cfg(test)]
