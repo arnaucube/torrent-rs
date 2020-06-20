@@ -486,6 +486,105 @@ fn msg_port(port: u16) -> Vec<u8> {
     b.to_vec()
 }
 
+#[derive(Debug)]
+struct Pieces {
+    requested: Vec<Vec<bool>>,
+    received: Vec<Vec<bool>>,
+}
+impl Pieces {
+    fn new(torrent: &Torrent) -> Pieces {
+        let sub_requested: Vec<bool> = vec![false; torrent.info.pieces.len()/20];
+        let sub_received: Vec<bool> = vec![false; torrent.info.pieces.len()/20];
+        let requested: Vec<Vec<bool>> = vec![sub_requested; torrent.info.pieces.len()/20];
+        let received: Vec<Vec<bool>> = vec![sub_received; torrent.info.pieces.len()/20];
+        Pieces{
+            requested: requested,
+            received: received,
+        }
+    }
+    fn add_requested(&mut self, block: &Payload) {
+        let index = block.begin / BLOCK_LEN;
+        self.requested[block.index as usize][index as usize] = true;
+    }
+    fn add_received(&mut self, block: &Payload) {
+        let index = block.begin / BLOCK_LEN;
+        self.requested[block.index as usize][index as usize] = true;
+    }
+    fn needed(&mut self, block: &Payload) -> bool {
+        let mut n = 1;
+        for i in 0..self.requested.len() {
+            for j in 0..self.requested[i].len() {
+                if self.requested[i][j] == false {
+                    n = n*0;   
+                }
+            }
+        }
+        if n==1 {
+            self.requested = self.received.clone();
+        }
+        let index = block.begin / BLOCK_LEN;
+        !self.requested[block.index as usize][index as usize]
+
+    }
+    fn is_done(&self, ) -> bool {
+        let mut n = 1;
+        for i in 0..self.requested.len() {
+            for j in 0..self.requested[i].len() {
+                if self.requested[i][j] == false {
+                    n = n*0;   
+                }
+            }
+        }
+        if n==1 {
+            return true;
+        }
+        false
+    }
+    fn print_percent_done(&self, ) {
+
+    }
+}
+
+struct Queue<'a>{
+    torrent: &'a Torrent,
+    queue: Vec<Payload>,
+    chocked: bool,
+}
+impl<'a> Queue<'a> {
+    fn new(torrent: &Torrent) -> Queue {
+        Queue{
+            torrent: torrent,
+            queue: Vec::new(),
+            chocked: true,
+        }
+    }
+    fn queue(&mut self, index: u32) {
+        let n_blocks = self.torrent.blocks_per_piece(index);
+        for i in 0..n_blocks {
+            let piece_block: Payload = Payload{
+                index: index,
+                begin: i*BLOCK_LEN,
+                length: self.torrent.block_len(index, i),
+                block: Block{
+                    length: 0,
+                    bytes: Vec::new(),
+                }
+            };
+            self.queue.push(piece_block);
+        }
+
+    }
+    fn get_last(&mut self) -> Payload {
+        self.queue.remove(self.queue.len())
+    }
+    fn peek(&self) -> &Payload {
+        &self.queue[0]
+    }
+    fn length(&self) -> usize {
+        self.queue.len()
+    }
+}
+
 
 #[cfg(test)]
 mod tests {
