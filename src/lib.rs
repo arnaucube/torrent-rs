@@ -404,6 +404,87 @@ fn bytes_to_ip(b: &[u8; 4]) -> String {
     Ipv4Addr::new(b[0], b[1], b[2], b[3]).to_string()
 }
 
+fn msg_handshake(info_hash: Vec<u8>) -> Vec<u8> {
+    let mut b: [u8; 68] = [0; 68];
+    b[0] = 19;
+    b[1..20].clone_from_slice(b"BitTorrent protocol"); // TODO use constant for the string
+
+    b[28..48].clone_from_slice(&info_hash);
+
+    b.to_vec()
+}
+
+fn msg_choke() -> Vec<u8> {
+    let mut b: [u8; 5] = [0; 5];
+    BigEndian::write_u32(&mut b[0..4], 1);
+    b.to_vec()
+}
+fn msg_unchoke() -> Vec<u8> {
+    let mut b: [u8; 5] = [0; 5];
+    BigEndian::write_u32(&mut b[0..4], 1);
+    b[4] = 1;
+    b.to_vec()
+}
+fn msg_interested() -> Vec<u8> {
+    let mut b: [u8; 5] = [0; 5];
+    BigEndian::write_u32(&mut b[0..4], 1);
+    b[4] = 2;
+    b.to_vec()
+}
+fn msg_notinterested() -> Vec<u8> {
+    let mut b: [u8; 5] = [0; 5];
+    BigEndian::write_u32(&mut b[0..4], 1);
+    b[4] = 3;
+    b.to_vec()
+}
+fn msg_have(payload: Payload) -> Vec<u8> {
+    let mut b: [u8; 9] = [0; 9];
+    BigEndian::write_u32(&mut b[0..4], 5);
+    b[4] = 4;
+    BigEndian::write_u32(&mut b[5..9], payload.index); // TODO REVIEW CHECK payload.index
+    b.to_vec()
+}
+fn msg_bitfield(bitfield: Vec<u8>) -> Vec<u8> {
+    let mut b: [u8; 14] = [0; 14];
+    BigEndian::write_u32(&mut b[0..4], bitfield.len() as u32);
+    b[4] = 5;
+    b[5..].clone_from_slice(&bitfield);
+    b.to_vec()
+}
+fn msg_request(payload: &Payload) -> Vec<u8> {
+    let mut b: [u8; 17] = [0; 17];
+    BigEndian::write_u32(&mut b[0..4], 13);
+    b[4] = 6;
+    BigEndian::write_u32(&mut b[5..9], payload.index);
+    BigEndian::write_u32(&mut b[9..13], payload.begin);
+    BigEndian::write_u32(&mut b[13..17], payload.length);
+    b.to_vec()
+}
+fn msg_piece(payload: Payload) -> Vec<u8> {
+    let mut b: [u8; 13] = [0; 13]; // TODO payload.block.length
+    BigEndian::write_u32(&mut b[0..4], payload.block.length+9);
+    b[4] = 7;
+    BigEndian::write_u32(&mut b[5..9], payload.index);
+    BigEndian::write_u32(&mut b[9..13], payload.begin);
+    b[13..].clone_from_slice(&payload.block.bytes);
+    b.to_vec()
+}
+fn msg_cancel(payload: Payload) -> Vec<u8> {
+    let mut b: [u8; 17] = [0; 17];
+    BigEndian::write_u32(&mut b[0..4], 13);
+    b[4] = 8;
+    BigEndian::write_u32(&mut b[5..9], payload.index);
+    BigEndian::write_u32(&mut b[9..13], payload.begin);
+    BigEndian::write_u32(&mut b[13..17], payload.length);
+    b.to_vec()
+}
+fn msg_port(port: u16) -> Vec<u8> {
+    let mut b: [u8; 7] = [0; 7];
+    BigEndian::write_u32(&mut b[0..4], 3);
+    b[4] = 9;
+    BigEndian::write_u16(&mut b[5..7], port);
+    b.to_vec()
+}
 
 
 #[cfg(test)]
